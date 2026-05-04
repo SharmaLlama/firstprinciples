@@ -209,8 +209,7 @@ window.Quarto = {
 <figcaption>Figure 1: showcasing the overall architecture of the transformer which we will refer back to throughout the series. The size of outputs from each layer is shown on the right (assuming batch size is 1).</figcaption>
 </figure>
 </div>
-<p><strong>What does a decoder-only transformer actually do?</strong> At its core, the entire architecture has one job: given a sequence of tokens, predict the next token. That’s it. Every layer we’re about to walk through - embeddings, attention, feed-forward networks - exists to<br>
-take the tokens seen so far and produce a probability distribution over the entire vocabulary for what should come next. The word “decoder” in “decoder-only” refers to this: the model <em>decodes</em> the most likely continuation of a sequence.</p>
+<p><strong>What does a decoder-only transformer actually do?</strong> At its core, the entire architecture has one job: given a sequence of tokens, predict the next token. That’s it. Every layer we’re about to walk through - embeddings, attention, feed-forward networks - exists to take the tokens seen so far and produce a probability distribution over the entire vocabulary for what should come next. The word “decoder” in “decoder-only” refers to this: the model <em>decodes</em> the most likely continuation of a sequence.</p>
 <p>When ChatGPT writes a paragraph, it’s doing this one token at a time. It predicts token 1, appends it to the input, predicts token 2, appends it, and so on.</p>
 <section id="what-is-a-token" class="level2">
 <h2 class="anchored" data-anchor-id="what-is-a-token">What is a Token?</h2>
@@ -510,7 +509,7 @@ Important
     }
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
       var mailtoRegex = new RegExp(/^mailto:/);
-        var filterRegex = new RegExp("https:\/\/SharmaLlama\.github\.io\/firstprinciples\/");
+        var filterRegex = new RegExp("https:\/\/blog\.utkarshsharma\.io");
       var isInternal = (href) => {
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }

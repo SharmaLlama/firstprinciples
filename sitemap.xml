@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://SharmaLlama.github.io/firstprinciples/about.html</loc>
+    <loc>https://blog.utkarshsharma.io/about.html</loc>
     <lastmod>2026-05-04T12:03:22.602Z</lastmod>
   </url>
   <url>
-    <loc>https://SharmaLlama.github.io/firstprinciples/posts/distributed-training/index.html</loc>
+    <loc>https://blog.utkarshsharma.io/posts/distributed-training/index.html</loc>
     <lastmod>2026-05-04T11:56:40.383Z</lastmod>
   </url>
   <url>
-    <loc>https://SharmaLlama.github.io/firstprinciples/posts/transformers-from-scratch/tokenisation-embeddings/index.html</loc>
-    <lastmod>2026-05-04T12:26:37.398Z</lastmod>
+    <loc>https://blog.utkarshsharma.io/posts/transformers-from-scratch/tokenisation-embeddings/index.html</loc>
+    <lastmod>2026-05-04T12:31:37.043Z</lastmod>
   </url>
   <url>
-    <loc>https://SharmaLlama.github.io/firstprinciples/posts/transformers-from-scratch/index.html</loc>
+    <loc>https://blog.utkarshsharma.io/posts/transformers-from-scratch/index.html</loc>
     <lastmod>2026-05-04T12:05:00.715Z</lastmod>
   </url>
   <url>
-    <loc>https://SharmaLlama.github.io/firstprinciples/index.html</loc>
+    <loc>https://blog.utkarshsharma.io/index.html</loc>
     <lastmod>2026-05-04T12:04:36.325Z</lastmod>
   </url>
 </urlset>
