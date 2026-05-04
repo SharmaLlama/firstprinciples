@@ -6,21 +6,19 @@ categories: [transformers, foundations]
 image: figures/transformer-arch.png
 ---                                                                                                                           
  
-Welcome to the first article of our multi-part series on building and training the foundations of what makes things like ChatGPT, Claude and Gemini work the way they do. The architecture is called a decoder-only transformer. By the end of this series, you'll be able 
-to fully understand the diagram below! Today we will look at *tokenisation*, *embeddings*, and the *unembedding layer*. I'll assume you're comfortable with basic linear algebra and have seen gradient descent before.
+Welcome to the first article of our multi-part series on building and training the foundations of what makes things like ChatGPT, Claude and Gemini work the way they do. The architecture is called a decoder-only transformer. By the end of this series, you'll be able to fully understand the diagram below! Today we will look at *tokenisation*, *embeddings*, and the *unembedding layer*. I'll assume you're comfortable with basic linear algebra and have seen gradient descent before.
                                                                                                                                                                                                                                                                          
 ![Figure 1: showcasing the overall architecture of the transformer which we will refer back to throughout the series. The size of outputs from each layer is shown on the right (assuming batch size is 1).](figures/transformer-arch.png){fig-align="center"}
                                                                                                                                                                                                                                                                          
-**What does a decoder-only transformer actually do?** At its core, the entire architecture has one job: given a sequence of tokens, predict the next token. That's it. Every layer we're about to walk through - embeddings, attention, feed-forward networks - exists to  
-take the tokens seen so far and produce a probability distribution over the entire vocabulary for what should come next. The word "decoder" in "decoder-only" refers to this: the model *decodes* the most likely continuation of a sequence.
+**What does a decoder-only transformer actually do?** At its core, the entire architecture has one job: given a sequence of tokens, predict the next token. That's it. Every layer we're about to walk through - embeddings, attention, feed-forward networks - exists to take the tokens seen so far and produce a probability distribution over the entire vocabulary for what should come next. The word "decoder" in "decoder-only" refers to this: the model *decodes* the most likely continuation of a sequence.
 
-When ChatGPT writes a paragraph, it's doing this one token at a time. It predicts token 1, appends it to the input, predicts token 2, appends it, and so on.                                                                                                               
+When ChatGPT writes a paragraph, it's doing this one token at a time. It predicts token 1, appends it to the input, predicts token 2, appends it, and so on.
  
-## What is a Token?                                                                                                                                                                                                                                                        
+## What is a Token?
               
-> "Claude Opus 4.7 has a context window of 1M tokens"                                                                                                                                                                                                                      
+> "Claude Opus 4.7 has a context window of 1M tokens"
 >
-> "Gemini 1.5 Pro has a context window of 2M tokens"                                                                                                                                                                                                                       
+> "Gemini 1.5 Pro has a context window of 2M tokens"
                                                                                                                                                                                                                                                                          
 For readers that have heard of these numbers getting thrown around without any context (haha get it?) and wonder "what is a token really?"
                 
