@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/utkarshsharma/Documents/Documents_final/Projects/firstprinciples/posts/transformers-from-scratch)",
+      "Bash(cp -r /Users/utkarshsharma/Documents/Documents_final/Projects/firstprinciples/posts/tokenisation-embeddings /Users/utkarshsharma/Documents/Documents_final/Projects/firstprinciples/posts/transformers-from-scratch/)",
+      "Bash(rm -rf /Users/utkarshsharma/Documents/Documents_final/Projects/firstprinciples/posts/tokenisation-embeddings)",
+      "Bash(quarto render *)",
+      "Bash(python3 *)"
+    ]
+  }
+}

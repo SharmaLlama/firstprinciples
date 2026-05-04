@@ -1,7 +1,33 @@
 ---
-title: "firstprinciples"
+title: "First Principles"
+description: "Making the unintuitive intuitive."
+page-layout: full
 ---
 
-This is a Quarto website.
+**First Principles** is a blog series covering machine learning and distributed systems from the ground up.
 
-To learn more about Quarto websites visit <https://quarto.org/docs/websites>.
+## Series
+
+<div class="series-grid">
+
+<a href="posts/transformers-from-scratch/" class="series-card-link">
+<div class="series-card">
+<div class="series-card-header">Transformers from Scratch</div>
+<div class="series-card-body">
+<p>Build a decoder-only transformer end to end - tokenisation, embeddings, feed-forward layers, layer Norms, attention heads, training loops, and inference.</p>
+<span class="series-badge">In progress</span>
+</div>
+</div>
+</a>
+
+<a href="posts/distributed-training/" class="series-card-link">
+<div class="series-card series-card-soon">
+<div class="series-card-header">Distributed Training from Scratch</div>
+<div class="series-card-body">
+<p>Data parallelism, model parallelism, gradient checkpointing, and the systems that make large-scale training possible.</p>
+<span class="series-badge series-badge-soon">Coming soon</span>
+</div>
+</div>
+</a>
+
+</div>

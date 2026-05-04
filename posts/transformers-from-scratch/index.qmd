@@ -1,0 +1,10 @@
+---
+title: "Transformers from Scratch"
+description: "Build a decoder-only transformer end to end - tokenisation, embeddings, feed-forward layers, layer Norms, attention heads, training loops, and inference"
+listing:
+  contents: "."
+  sort: "date asc"
+  type: grid
+  fields: [image, title, description, date]
+page-layout: full
+---
