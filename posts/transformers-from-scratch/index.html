@@ -6,8 +6,9 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="description" content="Build a decoder-only transformer end to end - tokenisation, embeddings, feed-forward layers, layer Norms, attention heads, training loops, and inference">
 
-<title>index – First Principles</title>
+<title>Transformers from Scratch – First Principles</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -33,6 +34,8 @@ ul.task-list li input[type="checkbox"] {
 <script src="../../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-listing/list.min.js"></script>
+<script src="../../site_libs/quarto-listing/quarto-listing.js"></script>
 <script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
 <script src="../../site_libs/quarto-html/popper.min.js"></script>
@@ -70,6 +73,35 @@ ul.task-list li input[type="checkbox"] {
     "search-label": "Search"
   }
 }</script>
+<script>
+
+  window.document.addEventListener("DOMContentLoaded", function (_event) {
+    const listingTargetEl = window.document.querySelector('#listing-listing .list');
+    if (!listingTargetEl) {
+      // No listing discovered, do not attach.
+      return; 
+    }
+
+    const options = {
+      valueNames: ['listing-image','listing-title','listing-description','listing-date',{ data: ['index'] },{ data: ['categories'] },{ data: ['listing-date-sort'] },{ data: ['listing-file-modified-sort'] }],
+      
+      searchColumns: ["listing-title","listing-author","listing-date","listing-image","listing-description"],
+    };
+
+    window['quarto-listings'] = window['quarto-listings'] || {};
+    window['quarto-listings']['listing-listing'] = new List('listing-listing', options);
+
+    if (window['quarto-listing-loaded']) {
+      window['quarto-listing-loaded']();
+    }
+  });
+
+  window.addEventListener('hashchange',() => {
+    if (window['quarto-listing-loaded']) {
+      window['quarto-listing-loaded']();
+    }
+  })
+  </script>
 
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
@@ -126,7 +158,7 @@ window.Quarto = {
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="../../about.qmd"> 
+    <a class="nav-link" href="../../about.html"> 
 <span class="menu-text">About</span></a>
   </li>  
 </ul>
@@ -137,230 +169,69 @@ window.Quarto = {
     </nav>
 </header>
 <!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-full page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
         
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+<main class="content column-page" id="quarto-document-content">
 
-
-
-
-<table class="caption-top table">
-<tbody>
-<tr class="odd">
-<td>title: “Tokenisation, Embeddings &amp; the Unembedding Layer”</td>
-</tr>
-<tr class="even">
-<td>description: “The first article in our series on decoder-only transformers — covering tokenisation schemes, embedding vectors, and the unembedding layer.”</td>
-</tr>
-<tr class="odd">
-<td>date: “2026-05-04”</td>
-</tr>
-<tr class="even">
-<td>categories: [transformers, foundations]</td>
-</tr>
-<tr class="odd">
-<td>image: https://cdn.hashnode.com/uploads/covers/69f4142b909e64ad07645ce4/1101ae35-8089-4625-a4ff-876c2ff89a57.png</td>
-</tr>
-</tbody>
-</table>
-<p>Welcome to the first article of our multi-part series on building and training the foundations of what makes things like ChatGPT, Claude and Gemini work the way they do. The architecture is called a decoder-only transformer. By the end of this series, you’ll be able to fully understand the diagram below! Today we will look at <em>tokenisation</em>, <em>embeddings</em>, and the <em>unembedding layer</em>. I’ll assume you’re comfortable with basic linear algebra and have seen gradient descent before.</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="figures/transformer-arch.png" class="img-fluid figure-img"></p>
-<figcaption>Figure 1: showcasing the overall architecture of the transformer which we will refer back to throughout the series. The size of outputs from each layer is shown on the right (assuming batch size is<br>
-1).</figcaption>
-</figure>
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Transformers from Scratch</h1>
 </div>
-<p><strong>What does a decoder-only transformer actually do?</strong> At its core, the entire architecture has one job: given a sequence of tokens, predict the next token. That’s it. Every layer we’re about to walk through — embeddings, attention, feed-forward networks — exists to<br>
-take the tokens seen so far and produce a probability distribution over the entire vocabulary for what should come next. The word “decoder” in “decoder-only” refers to this: the model <em>decodes</em> the most likely continuation of a sequence.</p>
-<p>When ChatGPT writes a paragraph, it’s doing this one token at a time. It predicts token 1, appends it to the input, predicts token 2, appends it, and so on.</p>
-<p>## What is a Token?</p>
-<blockquote class="blockquote">
-<p>“Claude Opus 4.7 has a context window of 1M tokens”</p>
-<p>“Gemini 1.5 Pro has a context window of 2M tokens”</p>
-</blockquote>
-<p>For readers that have heard of these numbers getting thrown around without any context (haha get it?) and wonder “what is a token really?”.</p>
-<p>A token is a fundamental unit of data (like bits in a computer, or genes in biology) in natural language processing (NLP) and it describes how letters, numbers, special characters and punctuations are broken up. A token can be anything from a single character, to<br>
-chunks of characters assigned arbitrarily or through a given algorithm.</p>
-<p>## Tokenisation Schemes</p>
-<p>Consider the following sentence (we refer to the sequence length as <span class="math inline">\(T\)</span>):</p>
-<p><span class="math display">\[\text{The cat sat on the mat!}\]</span></p>
-<p>We can imagine breaking this sentence up into tokens in many different ways:</p>
-<ul>
-<li><p><strong>Character Level Tokenisation</strong>: Where we split each character as a separate token. So the sentence above becomes <code>['T', 'h', 'e', ' ', 'c', 'a', 't', ' ', 's', 'a', 't', ' ', 'o', 'n', ' ', 't', 'h', 'e', ' ', 'm', 'a', 't', '!']</code></p></li>
-<li><p><strong>Word Level Tokenisation</strong>: Where we split the text based on some delimiter (in this case let’s take the space) as separate tokens. So the sentence above becomes <code>['The', 'cat', 'sat', 'on', 'the', 'mat!']</code></p></li>
-<li><p><strong>Subword Level Tokenisation</strong>: Where we split the text based on some rule or algorithm. E.g. I want to take 4-length chunks as my tokens. So the sentence above becomes <code>['The ', 'cat ', 'sat ', 'on t', 'he m', 'at! ']</code></p></li>
-</ul>
-<p>Each of these schemes comes with pros and cons:</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Tokenisation Scheme</th>
-<th>Pros</th>
-<th>Cons</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Character-Level</td>
-<td>Tiny vocabulary (e.g.&nbsp;128 for ASCII). No out-of-vocabulary (OOV) tokens — every possible input can be represented.</td>
-<td>Sequences become extremely long. “The cat sat on the mat!” becomes 27 tokens. This is a problem because attention has <span class="math inline">\(O(T^2)\)</span></td>
-</tr>
-<tr class="even">
-<td>cost — doubling sequence length quadruples compute. Individual characters also carry almost no semantic meaning on their own.</td>
-<td></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td>Word-Level</td>
-<td>Clean and intuitive — each token maps to a word humans recognise. Shorter sequences than character-level.</td>
-<td>Vocabulary explodes. English has ~170,000 words in current use, and that’s before you count misspellings, slang, conjugations</td>
-</tr>
-<tr class="even">
-<td>(run/ran/running/runs), and multilingual text. Any word not in the vocabulary becomes an <code>&lt;UNK&gt;</code> token, losing all information.</td>
-<td></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td>Subword-Level</td>
-<td>Common words stay as single tokens (“the”, “and”), while rare words get broken into meaningful pieces (“un” + “break” + “able”). Keeps vocabulary manageable (~50K–130K) while handling novel words gracefully.</td>
-<td>Tokenisation is no longer</td>
-</tr>
-</tbody>
-</table>
-<p>human-intuitive — word boundaries don’t always make linguistic sense. The best algorithms are also language-dependent since the rules are learnt from a training corpus: if they’re trained on English, it wastes tokens on Chinese/Japanese text, and vice versa. (Fun<br>
-Fact — this is why some models are better at “token-efficient” code — their tokenisers were trained on more python/C++ files). |</p>
-<p>Subword tokenisation gives us the best of both worlds: a manageable vocabulary size without sacrificing the ability to represent any input. This is why virtually every modern LLM uses some variant of it.</p>
-<p>## Vocabulary and Token IDs</p>
-<p>::: {.callout-tip} The number of unique tokens that can be represented by a tokenisation scheme is called its <em>vocabulary</em>. Each unique token is assigned a token ID within this vocabulary set. :::</p>
-<p>For example, if we’re using character level tokenisation for ASCII text then the vocabulary size is 128 (95 printable characters — uppercase A-Z, lowercase a-z, 0-9, and symbols — and 33 non-printable control characters).</p>
-<p>Modern LLMs like GPT, Claude and Gemini use their own proprietary tokenisation algorithms but a very common one used in many older GPT models and open-source models is called Byte-Pair Encoding (BPE). Andrej Karpathy has an excellent tutorial on BPE<br>
-<a href="https://www.youtube.com/watch?v=zduSFxRajkE">here</a> but it’s a subword level tokenisation algorithm. If we want to tokenise the above sentence using the GPT Tokeniser, it would look something like this:</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://cdn.hashnode.com/uploads/covers/69f4142b909e64ad07645ce4/2776794e-dea6-4ff3-9770-d57736acad56.png" class="img-fluid figure-img"></p>
-<figcaption>Figure 2: GPT-2 BPE Tokenisation and the corresponding token IDs</figcaption>
-</figure>
+
+<div>
+  <div class="description">
+    Build a decoder-only transformer end to end - tokenisation, embeddings, feed-forward layers, layer Norms, attention heads, training loops, and inference
+  </div>
 </div>
-<p>## What is an Embedding?</p>
-<p>Once we’ve converted an input text into tokens and assigned them to their corresponding token IDs, we need to find a way of capturing semantic meanings. Token IDs are randomly assigned and token ID 96 has no correspondence to token ID 97. But we want the<br>
-representation of the word ‘king’ to be close to the word ‘queen’ (even if their token IDs are not). This is where embedding vectors come into play.</p>
-<p>An embedding vector is a higher-dimensional numeric representation for a particular token ID. Each embedding vector tries to capture nuances, connections and semantic meanings between tokens. We do this through an embedding layer.</p>
-<p>::: {.callout-tip}<br>
-An embedding layer is a matrix with <span class="math inline">\(d\)</span> columns and <span class="math inline">\(V\)</span> rows where <span class="math inline">\(V\)</span> is the size of the tokeniser’s vocabulary and <span class="math inline">\(d\)</span> is the dimensions of the embedding vector (or embedding dim). It acts as a lookup table for the token IDs. :::</p>
-<div class="quarto-figure quarto-figure-center">
-<figure class="figure">
-<p><img src="https://cdn.hashnode.com/uploads/covers/69f4142b909e64ad07645ce4/fbc73cda-36f6-4eba-b2c1-f8b3fd29b5e5.png" class="img-fluid figure-img"></p>
-<figcaption>Figure 3: Given a learned embedding matrix, if we want to find the embedding vector for the word “Bat” (mapping to token ID 2), then we just take the second row of this<br>
-matrix!</figcaption>
-</figure>
+
+
+<div class="quarto-title-meta column-page">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+
+
+
+
+<div class="quarto-listing quarto-listing-container-grid" id="listing-listing">
+<div class="list grid quarto-listing-cols-3">
+<div class="g-col-1" data-index="0" data-categories="dHJhbnNmb3JtZXJzJTJDZm91bmRhdGlvbnM=" data-listing-date-sort="1777816800000" data-listing-file-modified-sort="1777897597398" data-listing-date-modified-sort="NaN" data-listing-reading-time-sort="52" data-listing-word-count-sort="10384">
+<a href="../../posts/transformers-from-scratch/tokenisation-embeddings/index.html" class="quarto-grid-link">
+<div class="quarto-grid-item card h-100 card-left">
+<p class="card-img-top">
+<img loading="lazy" src="../../posts/transformers-from-scratch/tokenisation-embeddings/figures/transformer-arch.png" class="thumbnail-image card-img" style="height: 150px;">
+</p>
+<div class="card-body post-contents">
+<h5 class="no-anchor card-title listing-title">
+Part 1 of Decoder-Only Transformers from Scratch Series
+</h5>
+<div class="card-text listing-description delink">
+<p><strong>Embeddings, tokenisation, vocabulary, learned vs fixed, why geometry matters</strong></p>
 </div>
-<p>In practice, this is exactly what deep learning frameworks do — an optimised index lookup: <code>embedding_matrix[token_id]</code>.</p>
-<p>### How the Embedding Lookup Actually Works</p>
-<p>The figure above shows the intuition: to get the embedding for token ID 2, we just grab row 2 of the matrix.</p>
-<p>::: {.callout-note title=“But wait — how is a table lookup differentiable?”}<br>
-Under the hood, this index lookup is mathematically equivalent to multiplying a one-hot vector by the embedding matrix. :::</p>
-<p>A <strong>one-hot vector</strong> is a vector of length <span class="math inline">\(V\)</span> (the vocabulary size) where every element is 0 except for a single 1 at the position of the token ID. For example, if our vocabulary has 5 words and we want token ID 2 (“Bat”), our one-hot vector is:</p>
-<p><span class="math display">\[\mathbf{x} = [0, 0, 1, 0, 0]\]</span></p>
-<p>When we multiply this one-hot vector by the embedding matrix <span class="math inline">\(W_e\)</span> of shape <span class="math inline">\([V \times d]\)</span> we get:</p>
-<p><span class="math display">\[\mathbf{e} = \mathbf{x} \cdot W_e = [0, 0, 1, 0, 0] \cdot \begin{bmatrix} 0.1 &amp; 0.4 &amp; 0.1\\ -0.2 &amp; 0.1 &amp; 0.7\\ -3.6 &amp; -1.5 &amp; 0.9\\ -6.7 &amp; 6.9 &amp; 4.2\\ 4.7 &amp; 1.8 &amp; 5.2\\ \end{bmatrix} = [-3.6, -1.5, 0.9]\]</span></p>
-<p>The result is exactly row 2 of the matrix — the embedding vector for “Bat”. The one-hot vector acts as a selector: the 1 “activates” the corresponding row, and the 0s zero out everything else.</p>
-<p>## The Geometry of Meaning</p>
-<p>This is perhaps the most beautiful property of learned embeddings: the directions in embedding space encode semantic relationships.</p>
-<p>The classic demonstration is the king–queen analogy. After training, the following approximate relationship holds between word vectors:</p>
-<p><span class="math display">\[\overrightarrow{\text{king}} - \overrightarrow{\text{man}} + \overrightarrow{\text{woman}} \approx \overrightarrow{\text{queen}}\]</span></p>
-<p>What does this mean? The vector from “man” to “king” represents the concept of <em>royalty</em>. When we apply that same vector (that same direction and magnitude) starting from “woman”, we arrive near “queen”. The embedding space has organised itself so that <strong>analogous<br>
-relationships correspond to parallel directions</strong>.</p>
-<p>Remarkably, this emerges purely from training on text data. The model learns that “king” and “queen” appear in similar contexts but differ in the same way that “man” and “woman” differ, and it encodes this pattern geometrically.</p>
-<p>As a caveat, this is a simplified demonstration; real embedding spaces are far messier, but the principle that directions encode relationships holds broadly.</p>
-<p>## The Embedding Layer as a Learned Parameter</p>
-<p>It’s worth emphasising: the embedding matrix is not hand-crafted or pre-computed. It is initialised randomly and trained alongside every other parameter in the model via gradient descent.</p>
-<p>At the start of training, “king” and “queen” have random embedding vectors with no meaningful relationship. Over billions of training examples, the model adjusts these vectors so that tokens appearing in similar contexts drift closer together in embedding space, and the geometric structure described above emerges organically.</p>
-<p>This has a subtle but important implication: <strong>the quality of your embeddings is bounded by the quality and quantity of your training data.</strong> If your training corpus contains very little medical text, the embeddings for medical terms will be poorly differentiated. If it contains biased associations (e.g.&nbsp;certain professions disproportionately linked with one gender), those biases will be encoded geometrically in the embedding space.</p>
-<p>## Dimensions &amp; Scale</p>
-<p>To ground this in reality, here are the actual embedding dimensions used by well-known open-source models:</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Model</th>
-<th>Vocab Size (<span class="math inline">\(V\)</span>)</th>
-<th>Embedding Dim (<span class="math inline">\(d\)</span>)</th>
-<th>Embedding Parameters</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>GPT-2</td>
-<td>50,257</td>
-<td>768</td>
-<td>38.6M</td>
-</tr>
-<tr class="even">
-<td>GPT-3 (175B)</td>
-<td>50,257</td>
-<td>12,288</td>
-<td>617.5M</td>
-</tr>
-<tr class="odd">
-<td>LLaMA 2 (7B)</td>
-<td>32,000</td>
-<td>4,096</td>
-<td>131.1M</td>
-</tr>
-<tr class="even">
-<td>LLaMA 3 (8B)</td>
-<td>128,256</td>
-<td>4,096</td>
-<td>525.3M</td>
-</tr>
-</tbody>
-</table>
-<p>A few things stand out: The embedding layer alone can have hundreds of millions of parameters. GPT-3’s embedding matrix is <span class="math inline">\(50{,}257 \times 12{,}288 \approx 617\text{M}\)</span> numbers. That’s a significant fraction of the total model — and this is just the lookup table<br>
-before any actual computation happens.</p>
-<p><strong>Larger <span class="math inline">\(d\)</span> means richer representations but higher cost.</strong> Every subsequent layer in the transformer operates on vectors of size <span class="math inline">\(d\)</span>. Since attention has a cost proportional to <span class="math inline">\(d\)</span> (more on this in a later post), doubling the embedding dimension affects the cost of every layer above it. This is the core architectural tradeoff: expressive embeddings vs.&nbsp;computational budget.</p>
-<p>Notice LLaMA 3 quadrupled its vocabulary from LLaMA 2 (32K → 128K). A larger vocabulary means common multi-character sequences get their own token, which shortens sequences (fewer tokens per sentence = faster inference). But it also means a larger embedding matrix<br>
-and a larger unembedding matrix.</p>
-<p>We’ve now followed our input from raw text → tokens → embeddings → through the decoder blocks. The output is a matrix of shape <span class="math inline">\([T \times d]\)</span> — one vector per position. But remember: the model’s job is to predict the next token. So we need to convert these abstract<br>
-<span class="math inline">\(d\)</span>-dimensional vectors back into a probability over every word in the vocabulary. That’s what the unembedding layer does.</p>
-<p>## The Unembedding Layer</p>
-<p>At the very top of our architecture diagram sits the unembedding layer — the mirror image of the embedding layer.</p>
-<p>After the input has passed through every decoder block, the model produces an output of shape <span class="math inline">\([T \times d]\)</span> — one <span class="math inline">\(d\)</span>-dimensional vector per token position. But we need a <em>probability distribution over the vocabulary</em> to predict the next token. We need to go from<br>
-<span class="math inline">\(d\)</span> dimensions back to <span class="math inline">\(V\)</span> dimensions (one score per possible token). The unembedding layer does exactly this. It’s a matrix <span class="math inline">\(\mathbf{W_u}\)</span> of shape <span class="math inline">\([d \times V]\)</span> that projects each output vector back into vocabulary space:</p>
-<p><span class="math display">\[\text{logits} = \mathbf{h} \cdot \mathbf{W_u}\]</span></p>
-<p>where <span class="math inline">\(\mathbf{h}\)</span> is the <span class="math inline">\([T \times d]\)</span> output from the final decoder block, and the result is a <span class="math inline">\([T \times V]\)</span> matrix of logits — raw, unnormalised scores for every token in the vocabulary at every position.</p>
-<p>::: {.callout-note title=“Why not just pick the token with the highest logit?”}<br>
-Because we want a full probability distribution — not just a winner, but how confident the model is across all candidates. This lets us sample creatively from the top-k most likely tokens rather than always picking the single most probable one. Softmax gives us exactly that.<br>
-:::</p>
-<p><span class="math display">\[P(\text{token}_i) = \frac{e^{\text{logit}_i}}{\sum_{j=1}^{V} e^{\text{logit}_j}}\]</span></p>
-<p>The token with the highest probability is (roughly speaking) the model’s prediction for what comes next.</p>
-<p>### Weight Tying</p>
-<p>Here’s an elegant detail: in many modern transformers, <strong>the unembedding matrix is the transpose of the embedding matrix</strong>:</p>
-<p><span class="math display">\[\mathbf{W}_u = \mathbf{W}_e^T\]</span></p>
-<p>This is called weight tying, and it means the model uses the same parameters for both “looking up” token meanings (embedding) and “predicting” tokens (unembedding). Intuitively this makes sense — if two tokens have similar embeddings (similar meanings), the<br>
-unembedding should also score them similarly when predicting the next token. Weight tying also halves the parameter count of these two layers. For GPT-3, that’s saving roughly 617 million parameters. Not all models use weight tying (GPT-2 does, LLaMA does not), but it connects the top and bottom of the architecture diagram in a satisfying way: the same matrix that converts token IDs into meaning also converts meaning back into token predictions.</p>
-<p>## What’s Next</p>
-<p>But these embedding vectors have no sense of order. “The cat sat on the mat” and “The mat sat on the cat” produce <strong>identical</strong> sets of embedding vectors — the model can’t tell them apart. Clearly, word order matters for meaning. That’s what <strong>positional encoding</strong><br>
-solves, and it’s the subject of the next post.</p>
-
-
-
-</main> <!-- /main -->
+<div class="card-attribution card-text-small end">
+<div class="listing-date">
+May 4, 2026
+</div>
+</div>
+</div>
+</div></a>
+</div>
+</div>
+<div class="listing-no-matching d-none">No matching items</div>
+</div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";

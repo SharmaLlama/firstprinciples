@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2026-05-04">
+<meta name="description" content="Embeddings, tokenisation, vocabulary, learned vs fixed, why geometry matters">
+
+<title>Part 1 of Decoder-Only Transformers from Scratch Series – First Principles</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../../">
+<script src="../../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../../site_libs/bootstrap/bootstrap-158031087360bce0ff56dc785ce39e06.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../../index.html">
+    <span class="navbar-title">First Principles</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../../about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#what-is-a-token" id="toc-what-is-a-token" class="nav-link active" data-scroll-target="#what-is-a-token">What is a Token?</a></li>
+  <li><a href="#tokenisation-schemes" id="toc-tokenisation-schemes" class="nav-link" data-scroll-target="#tokenisation-schemes">Tokenisation Schemes</a></li>
+  <li><a href="#vocabulary-and-token-ids" id="toc-vocabulary-and-token-ids" class="nav-link" data-scroll-target="#vocabulary-and-token-ids">Vocabulary and Token IDs</a></li>
+  <li><a href="#what-is-an-embedding" id="toc-what-is-an-embedding" class="nav-link" data-scroll-target="#what-is-an-embedding">What is an Embedding?</a>
+  <ul class="collapse">
+  <li><a href="#how-the-embedding-lookup-actually-works" id="toc-how-the-embedding-lookup-actually-works" class="nav-link" data-scroll-target="#how-the-embedding-lookup-actually-works">How the Embedding Lookup Actually Works</a></li>
+  </ul></li>
+  <li><a href="#the-geometry-of-meaning" id="toc-the-geometry-of-meaning" class="nav-link" data-scroll-target="#the-geometry-of-meaning">The Geometry of Meaning</a></li>
+  <li><a href="#the-embedding-layer-as-a-learned-parameter" id="toc-the-embedding-layer-as-a-learned-parameter" class="nav-link" data-scroll-target="#the-embedding-layer-as-a-learned-parameter">The Embedding Layer as a Learned Parameter</a></li>
+  <li><a href="#dimensions-scale" id="toc-dimensions-scale" class="nav-link" data-scroll-target="#dimensions-scale">Dimensions &amp; Scale</a></li>
+  <li><a href="#the-unembedding-layer" id="toc-the-unembedding-layer" class="nav-link" data-scroll-target="#the-unembedding-layer">The Unembedding Layer</a>
+  <ul class="collapse">
+  <li><a href="#weight-tying" id="toc-weight-tying" class="nav-link" data-scroll-target="#weight-tying">Weight Tying</a></li>
+  </ul></li>
+  <li><a href="#whats-next" id="toc-whats-next" class="nav-link" data-scroll-target="#whats-next">What’s Next</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Part 1 of Decoder-Only Transformers from Scratch Series</h1>
+  <div class="quarto-categories">
+    <div class="quarto-category">transformers</div>
+    <div class="quarto-category">foundations</div>
+  </div>
+  </div>
+
+<div>
+  <div class="description">
+    <strong>Embeddings, tokenisation, vocabulary, learned vs fixed, why geometry matters</strong>
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 4, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>Welcome to the first article of our multi-part series on building and training the foundations of what makes things like ChatGPT, Claude and Gemini work the way they do. The architecture is called a decoder-only transformer. By the end of this series, you’ll be able to fully understand the diagram below! Today we will look at <em>tokenisation</em>, <em>embeddings</em>, and the <em>unembedding layer</em>. I’ll assume you’re comfortable with basic linear algebra and have seen gradient descent before.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/transformer-arch.png" class="img-fluid figure-img"></p>
+<figcaption>Figure 1: showcasing the overall architecture of the transformer which we will refer back to throughout the series. The size of outputs from each layer is shown on the right (assuming batch size is 1).</figcaption>
+</figure>
+</div>
+<p><strong>What does a decoder-only transformer actually do?</strong> At its core, the entire architecture has one job: given a sequence of tokens, predict the next token. That’s it. Every layer we’re about to walk through - embeddings, attention, feed-forward networks - exists to<br>
+take the tokens seen so far and produce a probability distribution over the entire vocabulary for what should come next. The word “decoder” in “decoder-only” refers to this: the model <em>decodes</em> the most likely continuation of a sequence.</p>
+<p>When ChatGPT writes a paragraph, it’s doing this one token at a time. It predicts token 1, appends it to the input, predicts token 2, appends it, and so on.</p>
+<section id="what-is-a-token" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-a-token">What is a Token?</h2>
+<blockquote class="blockquote">
+<p>“Claude Opus 4.7 has a context window of 1M tokens”</p>
+<p>“Gemini 1.5 Pro has a context window of 2M tokens”</p>
+</blockquote>
+<p>For readers that have heard of these numbers getting thrown around without any context (haha get it?) and wonder “what is a token really?”</p>
+<p>A token is a fundamental unit of data (like bits in a computer, or genes in biology) in natural language processing (NLP) and it describes how letters, numbers, special characters and punctuations are broken up. A token can be anything from a single character, to chunks of characters assigned arbitrarily or through a given algorithm.</p>
+</section>
+<section id="tokenisation-schemes" class="level2">
+<h2 class="anchored" data-anchor-id="tokenisation-schemes">Tokenisation Schemes</h2>
+<p>Consider the following sentence (we refer to the sequence length as <span class="math inline">\(T\)</span>):</p>
+<p><span class="math display">\[\text{The cat sat on the mat!}\]</span></p>
+<p>We can imagine breaking this sentence up into tokens in many different ways:</p>
+<ul>
+<li><p><strong>Character Level Tokenisation</strong>: Where we split each character as a separate token. So the sentence above becomes <code>['T', 'h', 'e', ' ', 'c', 'a', 't', ' ', 's', 'a', 't', ' ', 'o', 'n', ' ', 't', 'h', 'e', ' ', 'm', 'a', 't', '!']</code></p></li>
+<li><p><strong>Word Level Tokenisation</strong>: Where we split the text based on some delimiter (in this case let’s take the space) as separate tokens. So the sentence above becomes <code>['The', 'cat', 'sat', 'on', 'the', 'mat!']</code></p></li>
+<li><p><strong>Subword Level Tokenisation</strong>: Where we split the text based on some rule or algorithm. E.g. I want to take 4-length chunks as my tokens. So the sentence above becomes <code>['The ', 'cat ', 'sat ', 'on t', 'he m', 'at! ']</code></p></li>
+</ul>
+<p>Each of these schemes comes with pros and cons:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tokenisation Scheme</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Character-Level</td>
+<td>Tiny vocabulary (e.g.&nbsp;128 for ASCII). No out-of-vocabulary (OOV) tokens — every possible input can be represented.</td>
+<td>Sequences become extremely long. “The cat sat on the mat!” becomes 27 tokens. This is a problem because attention has <span class="math inline">\(O(T^2)\)</span> cost - doubling sequence length quadruples compute. Individual characters also carry almost no semantic meaning on their own.</td>
+</tr>
+<tr class="even">
+<td>Word-Level</td>
+<td>Clean and intuitive - each token maps to a word humans recognise. Shorter sequences than character-level.</td>
+<td>Vocabulary explodes. English has ~170,000 words in current use, and that’s before you count misspellings, slang, conjugations (run/ran/running/runs), and multilingual text. Any word not in the vocabulary becomes an <code>&lt;UNK&gt;</code> token, losing all information.</td>
+</tr>
+<tr class="odd">
+<td>Subword-Level</td>
+<td>Common words stay as single tokens (“the”, “and”), while rare words get broken into meaningful pieces (“un” + “break” + “able”). Keeps vocabulary manageable (~50K–130K) while handling novel words gracefully.</td>
+<td>Tokenisation is no longer human-intuitive - word boundaries don’t always make linguistic sense. The best algorithms are also language-dependent since the rules are learnt from a training corpus: if they’re trained on English, it wastes tokens on Chinese/Japanese text, and vice versa. (Fun Fact - this is why some models are better at “token-efficient” code - their tokenisers were trained on more python/C++ files).</td>
+</tr>
+</tbody>
+</table>
+<p>Subword tokenisation gives us the best of both worlds: a manageable vocabulary size without sacrificing the ability to represent any input. This is why virtually every modern LLM uses some variant of it.</p>
+</section>
+<section id="vocabulary-and-token-ids" class="level2">
+<h2 class="anchored" data-anchor-id="vocabulary-and-token-ids">Vocabulary and Token IDs</h2>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The number of unique tokens that can be represented by a tokenisation scheme is called its <em>vocabulary</em>. Each unique token is assigned a token ID within this vocabulary set.</p>
+</div>
+</div>
+<p>For example, if we’re using character level tokenisation for ASCII text then the vocabulary size is 128 (95 printable characters - uppercase A-Z, lowercase a-z, 0-9, and symbols - and 33 non-printable control characters).</p>
+<p>Modern LLMs like GPT, Claude and Gemini use their own proprietary tokenisation algorithms but a very common one used in many older GPT models and open-source models is called Byte-Pair Encoding (BPE). Andrej Karpathy has an excellent tutorial on BPE <a href="https://www.youtube.com/watch?v=zduSFxRajkE">here</a> but it’s a subword level tokenisation algorithm. If we want to tokenise the above sentence using the GPT Tokeniser, it would look something like this:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/tokenizer-split.png" class="img-fluid quarto-figure quarto-figure-center figure-img"></p>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/tokenizer-id.png" class="img-fluid figure-img"></p>
+<figcaption>Figure 2: GPT-2 BPE Tokenisation and the corresponding token IDs</figcaption>
+</figure>
+</div>
+</section>
+<section id="what-is-an-embedding" class="level2">
+<h2 class="anchored" data-anchor-id="what-is-an-embedding">What is an Embedding?</h2>
+<p>Once we’ve converted an input text into tokens and assigned them to their corresponding token IDs, we need to find a way of capturing semantic meanings. Token IDs are randomly assigned and token ID 96 has no correspondence to token ID 97. But we want the representation of the word ‘king’ to be close to the word ‘queen’ (even if their token IDs are not). This is where embedding vectors come into play.</p>
+<p>An embedding vector is a higher-dimensional numeric representation for a particular token ID. Each embedding vector tries to capture nuances, connections and semantic meanings between tokens. We do this through an embedding layer.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>An embedding layer is a matrix with <span class="math inline">\(d\)</span> columns and <span class="math inline">\(V\)</span> rows where <span class="math inline">\(V\)</span> is the size of the tokeniser’s vocabulary and <span class="math inline">\(d\)</span> is the dimensions of the embedding vector (or embedding dim). It acts as a lookup table for the token IDs.</p>
+</div>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/embedding-matrix.png" class="img-fluid figure-img"></p>
+<figcaption>Figure 3: Given a learned embedding matrix, if we want to find the embedding vector for the word “Bat” (mapping to token ID 2), then we just take the second row of this matrix!</figcaption>
+</figure>
+</div>
+<p>In practice, this is exactly what deep learning frameworks do - an optimised index lookup: <code>embedding_matrix[token_id]</code>.</p>
+<section id="how-the-embedding-lookup-actually-works" class="level3">
+<h3 class="anchored" data-anchor-id="how-the-embedding-lookup-actually-works">How the Embedding Lookup Actually Works</h3>
+<p>The figure above shows the intuition: to get the embedding for token ID 2, we just grab row 2 of the matrix.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="But wait — how is a table lookup differentiable?">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>But wait — how is a table lookup differentiable?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Under the hood, this index lookup is mathematically equivalent to multiplying a one-hot vector by the embedding matrix.</p>
+</div>
+</div>
+<p>A <strong>one-hot vector</strong> is a vector of length <span class="math inline">\(V\)</span> (the vocabulary size) where every element is 0 except for a single 1 at the position of the token ID. For example, if our vocabulary has 5 words and we want token ID 2 (“Bat”), our one-hot vector is: <span class="math display">\[\mathbf{x} = [0, 0, 1, 0, 0]\]</span></p>
+<p>When we multiply this one-hot vector by the embedding matrix <span class="math inline">\(W_e\)</span> of shape <span class="math inline">\([V \times d]\)</span> we get:</p>
+<p><span class="math display">\[\mathbf{e} = \mathbf{x} \cdot W_e = [0, 0, 1, 0, 0] \cdot \begin{bmatrix} 0.1 &amp; 0.4 &amp; 0.1\\ -0.2 &amp; 0.1 &amp; 0.7\\ -3.6 &amp; -1.5 &amp; 0.9\\ -6.7 &amp; 6.9 &amp; 4.2\\ 4.7 &amp; 1.8 &amp; 5.2\\ \end{bmatrix} = [-3.6, -1.5, 0.9]\]</span></p>
+<p>The result is exactly row 2 of the matrix — the embedding vector for “Bat”. The one-hot vector acts as a selector: the 1 “activates” the corresponding row, and the 0s zero out everything else.</p>
+</section>
+</section>
+<section id="the-geometry-of-meaning" class="level2">
+<h2 class="anchored" data-anchor-id="the-geometry-of-meaning">The Geometry of Meaning</h2>
+<p>This is perhaps the most beautiful property of learned embeddings: the directions in embedding space encode semantic relationships.</p>
+<p>The classic demonstration is the king–queen analogy. After training, the following approximate relationship holds between word vectors:</p>
+<p><span class="math display">\[\overrightarrow{\text{king}} - \overrightarrow{\text{man}} + \overrightarrow{\text{woman}} \approx \overrightarrow{\text{queen}}\]</span></p>
+<p>What does this mean? The vector from “man” to “king” represents the concept of <em>royalty</em>. When we apply that same vector (that same direction and magnitude) starting from “woman”, we arrive near “queen”. The embedding space has organised itself so that <strong>analogous relationships correspond to parallel directions</strong>.</p>
+<p>Remarkably, this emerges purely from training on text data. The model learns that “king” and “queen” appear in similar contexts but differ in the same way that “man” and “woman” differ, and it encodes this pattern geometrically.</p>
+<p>As a caveat, this is a simplified demonstration; real embedding spaces are far messier, but the principle that directions encode relationships holds broadly.</p>
+</section>
+<section id="the-embedding-layer-as-a-learned-parameter" class="level2">
+<h2 class="anchored" data-anchor-id="the-embedding-layer-as-a-learned-parameter">The Embedding Layer as a Learned Parameter</h2>
+<p>It’s worth emphasising: the embedding matrix is not hand-crafted or pre-computed. It is initialised randomly and trained alongside every other parameter in the model via gradient descent.</p>
+<p>At the start of training, “king” and “queen” have random embedding vectors with no meaningful relationship. Over billions of training examples, the model adjusts these vectors so that tokens appearing in similar contexts drift closer together in embedding space, and the geometric structure described above emerges organically.</p>
+<p>This has a subtle but important implication: <strong>the quality of your embeddings is bounded by the quality and quantity of your training data.</strong> If your training corpus contains very little medical text, the embeddings for medical terms will be poorly differentiated. If it contains biased associations (e.g.&nbsp;certain professions disproportionately linked with one gender), those biases will be encoded geometrically in the embedding space.</p>
+</section>
+<section id="dimensions-scale" class="level2">
+<h2 class="anchored" data-anchor-id="dimensions-scale">Dimensions &amp; Scale</h2>
+<p>To ground this in reality, here are the actual embedding dimensions used by well-known open-source models:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Model</th>
+<th>Vocab Size (<span class="math inline">\(V\)</span>)</th>
+<th>Embedding Dim (<span class="math inline">\(d\)</span>)</th>
+<th>Embedding Parameters</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GPT-2</td>
+<td>50,257</td>
+<td>768</td>
+<td>38.6M</td>
+</tr>
+<tr class="even">
+<td>GPT-3 (175B)</td>
+<td>50,257</td>
+<td>12,288</td>
+<td>617.5M</td>
+</tr>
+<tr class="odd">
+<td>LLaMA 2 (7B)</td>
+<td>32,000</td>
+<td>4,096</td>
+<td>131.1M</td>
+</tr>
+<tr class="even">
+<td>LLaMA 3 (8B)</td>
+<td>128,256</td>
+<td>4,096</td>
+<td>525.3M</td>
+</tr>
+</tbody>
+</table>
+<p>A few things stand out: The embedding layer alone can have hundreds of millions of parameters. GPT-3’s embedding matrix is <span class="math inline">\(50{,}257 \times 12{,}288 \approx 617\text{M}\)</span> numbers. That’s a significant fraction of the total model - and this is just the lookup table before any actual computation happens. This is why we need to be careful with the vocabulary size and embedding dimension.</p>
+<p><strong>Larger <span class="math inline">\(d\)</span> means richer representations but higher cost.</strong> Every subsequent layer in the transformer operates on vectors of size <span class="math inline">\(d\)</span>. Since attention has a cost proportional to <span class="math inline">\(d\)</span> (more on this in a later post), doubling the embedding dimension affects the cost of every layer above it. This is the core architectural tradeoff: expressive embeddings vs.&nbsp;computational budget.</p>
+<p>Notice LLaMA 3 quadrupled its vocabulary from LLaMA 2 (32K → 128K). A larger vocabulary means common multi-character sequences get their own token, which shortens sequences (fewer tokens per sentence = faster inference). But it also means a larger embedding matrix and a larger unembedding matrix.</p>
+<p>We’ve now followed our input from raw text → tokens → embeddings → through the decoder blocks. The output is a matrix of shape <span class="math inline">\([T \times d]\)</span> — one vector per position. But remember: the model’s job is to predict the next token. So we need to convert these abstract <span class="math inline">\(d\)</span>-dimensional vectors back into a probability over every word in the vocabulary. That’s what the unembedding layer does.</p>
+</section>
+<section id="the-unembedding-layer" class="level2">
+<h2 class="anchored" data-anchor-id="the-unembedding-layer">The Unembedding Layer</h2>
+<p>At the very top of our architecture diagram sits the unembedding layer - the mirror image of the embedding layer.</p>
+<p>After the input has passed through every decoder block, the model produces an output of shape <span class="math inline">\([T \times d]\)</span> - one <span class="math inline">\(d\)</span>-dimensional vector per token position. But we need a <em>probability distribution over the vocabulary</em> to predict the next token. We need to go from <span class="math inline">\(d\)</span> dimensions back to <span class="math inline">\(V\)</span> dimensions (one score per possible token). The unembedding layer does exactly this. It’s a matrix <span class="math inline">\(\mathbf{W_u}\)</span> of shape <span class="math inline">\([d \times V]\)</span> that projects each output vector back into vocabulary space: <span class="math display">\[\text{logits} = \mathbf{h} \cdot \mathbf{W_u}\]</span> where <span class="math inline">\(\mathbf{h}\)</span> is the <span class="math inline">\([T \times d]\)</span> output from the final decoder block, and the result is a <span class="math inline">\([T \times V]\)</span> matrix of logits — raw, unnormalised scores for every token in the vocabulary at every position.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="Why not just pick the token with the highest logit?">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Why not just pick the token with the highest logit?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Because we want a full probability distribution - not just a winner, but how confident the model is across all candidates. This lets us sample creatively from the top-k most likely tokens rather than always picking the single most probable one. Softmax gives us exactly that.</p>
+</div>
+</div>
+<p>The softmax function is defined as: <span class="math display">\[P(\text{token}_i) = \frac{e^{\text{logit}_i}}{\sum_{j=1}^{V} e^{\text{logit}_j}}\]</span></p>
+<p>The token with the highest probability is (roughly speaking) the model’s prediction for what comes next.</p>
+<section id="weight-tying" class="level3">
+<h3 class="anchored" data-anchor-id="weight-tying">Weight Tying</h3>
+<p>Here’s an elegant detail: in many modern transformers, <strong>the unembedding matrix is the transpose of the embedding matrix</strong>: <span class="math display">\[\mathbf{W}_u = \mathbf{W}_e^T\]</span> This is called weight tying, and it means the model uses the same parameters for both “looking up” token meanings (embedding) and “predicting” tokens (unembedding). Intuitively this makes sense — if two tokens have similar embeddings (similar meanings), the unembedding should also score them similarly when predicting the next token. Weight tying also halves the parameter count of these two layers. For GPT-3, that’s saving roughly 617 million parameters. Not all models use weight tying (GPT-2 does, LLaMA does not), but it connects the top and bottom of the architecture diagram in a satisfying way: the same matrix that converts token IDs into meaning also converts meaning back into token predictions.</p>
+</section>
+</section>
+<section id="whats-next" class="level2">
+<h2 class="anchored" data-anchor-id="whats-next">What’s Next</h2>
+<p>But these embedding vectors have no sense of order. “The cat sat on the mat” and “The mat sat on the cat” produce <strong>identical</strong> sets of embedding vectors — the model can’t tell them apart. Clearly, word order matters for meaning. That’s what <strong>positional encoding</strong> solves, and it’s the subject of the next post.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/SharmaLlama\.github\.io\/firstprinciples\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
