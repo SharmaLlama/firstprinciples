@@ -154,6 +154,7 @@ window.Quarto = {
   <ul class="collapse">
   <li><a href="#how-the-embedding-lookup-actually-works" id="toc-how-the-embedding-lookup-actually-works" class="nav-link" data-scroll-target="#how-the-embedding-lookup-actually-works">How the Embedding Lookup Actually Works</a></li>
   </ul></li>
+  <li><a href="#measuring-similarity-the-dot-product" id="toc-measuring-similarity-the-dot-product" class="nav-link" data-scroll-target="#measuring-similarity-the-dot-product">Measuring Similarity: The Dot Product</a></li>
   <li><a href="#the-geometry-of-meaning" id="toc-the-geometry-of-meaning" class="nav-link" data-scroll-target="#the-geometry-of-meaning">The Geometry of Meaning</a></li>
   <li><a href="#the-embedding-layer-as-a-learned-parameter" id="toc-the-embedding-layer-as-a-learned-parameter" class="nav-link" data-scroll-target="#the-embedding-layer-as-a-learned-parameter">The Embedding Layer as a Learned Parameter</a></li>
   <li><a href="#dimensions-scale" id="toc-dimensions-scale" class="nav-link" data-scroll-target="#dimensions-scale">Dimensions &amp; Scale</a></li>
@@ -302,7 +303,7 @@ Important
 <h2 class="anchored" data-anchor-id="what-is-an-embedding">What is an Embedding?</h2>
 <p>Once we’ve converted an input text into tokens and assigned them their token IDs, we have a sequence of integers. But integers alone are not enough.</p>
 <p>Here’s why: token IDs are arbitrary labels. The token for “king” might happen to be 4621 and the token for “queen” might be 9817 - those numbers are just slots in a lookup table, and the numerical gap between them means nothing. From the model’s perspective, “king” and “banana” are exactly as related as “king” and “queen”: they’re all just different integers. But we <em>know</em> “king” and “queen” are related concepts (same kind of entity, similar contexts, related meaning), and the same goes for “cat” and “dog”, or “Paris” and “London”. A model that takes raw token IDs as input has no way to express any of this - it’s starting from zero.</p>
-<p>So we need a richer representation - one where the representation of “king” sits <em>close</em> to “queen” in some mathematical space, and far from “banana”. (We’ll formalise what “close” means in <a href="#the-geometry-of-meaning">The Geometry of Meaning</a> below.) This is what embedding vectors give us.</p>
+<p>So we need a richer representation - one where the representation of “king” sits <em>close</em> to “queen” in some mathematical space, and far from “banana”. (We’ll make “close” precise in just a moment.) This is what embedding vectors give us.</p>
 <p>An embedding vector is a higher-dimensional numeric representation for a particular token ID. Each embedding vector tries to capture nuances, connections and semantic meanings between tokens. We do this through an embedding layer.</p>
 <div class="callout callout-style-default callout-important callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -346,6 +347,39 @@ Important
 <p>The result is exactly row 2 of the matrix — the embedding vector for “Bat”. The one-hot vector acts as a selector: the 1 “activates” the corresponding row, and the 0s zero out everything else.</p>
 </section>
 </section>
+<section id="measuring-similarity-the-dot-product" class="level2">
+<h2 class="anchored" data-anchor-id="measuring-similarity-the-dot-product">Measuring Similarity: The Dot Product</h2>
+<p>We’ve been using “close” loosely. Time to make it precise.</p>
+<p>The standard way to measure similarity between two embedding vectors is the <strong>dot product</strong>:</p>
+<p><span class="math display">\[\mathbf{a} \cdot \mathbf{b} = \sum_{i=1}^{d} a_i b_i\]</span></p>
+<p>The geometric intuition is what matters here:</p>
+<ul>
+<li>Two vectors pointing in the <strong>same direction</strong> → large positive dot product.</li>
+<li>Two vectors pointing in <strong>opposite directions</strong> → large negative dot product.</li>
+<li>Two <strong>perpendicular</strong> vectors → dot product of 0.</li>
+</ul>
+<p>So “close in meaning” really means “vectors that point in similar directions, giving a large dot product”.</p>
+<p>A concrete toy example. Suppose our embedding dim is just 2 and, after training, we end up with:</p>
+<p><span class="math display">\[\overrightarrow{\text{king}} = [4, 5] \qquad \overrightarrow{\text{queen}} = [4.5, 5.2] \qquad \overrightarrow{\text{banana}} = [-3, -4]\]</span></p>
+<p>Then:</p>
+<p><span class="math display">\[\overrightarrow{\text{king}} \cdot \overrightarrow{\text{queen}} = 4(4.5) + 5(5.2) = 18 + 26 = 44\]</span></p>
+<p><span class="math display">\[\overrightarrow{\text{king}} \cdot \overrightarrow{\text{banana}} = 4(-3) + 5(-4) = -12 - 20 = -32\]</span></p>
+<p>“king” and “queen” point in nearly the same direction, so their dot product is large and positive. “king” and “banana” point in roughly opposite directions, so theirs is large and negative. The dot product collapses the relationship between two vectors into a single number that captures how aligned (and therefore semantically similar) they are.</p>
+<div class="callout callout-style-default callout-note callout-titled" title="What about cosine similarity?">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>What about cosine similarity?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The raw dot product is sensitive to vector magnitude - a long vector will produce a big dot product with everything, even unrelated tokens. To handle this, people often use <em>cosine similarity</em>, which divides the dot product by the magnitudes of both vectors to give a clean score between <span class="math inline">\(-1\)</span> and <span class="math inline">\(1\)</span> regardless of vector length: <span class="math display">\[\text{cos\_sim}(\mathbf{a}, \mathbf{b}) = \frac{\mathbf{a} \cdot \mathbf{b}}{\|\mathbf{a}\| \, \|\mathbf{b}\|}\]</span></p>
+</div>
+</div>
+<p>This idea - that a dot product measures how aligned two vectors are - is going to come back in a big way when we get to <strong>attention</strong>, where dot products between query and key vectors are the core mechanism that lets one token “look at” another. For now, the takeaway is just: vectors close together in embedding space have large dot products, and that’s what “close in meaning” means.</p>
+</section>
 <section id="the-geometry-of-meaning" class="level2">
 <h2 class="anchored" data-anchor-id="the-geometry-of-meaning">The Geometry of Meaning</h2>
 <p>This is perhaps the most beautiful property of learned embeddings: the directions in embedding space encode semantic relationships.</p>
@@ -353,7 +387,7 @@ Important
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/embedding-space-2d.svg" class="img-fluid figure-img"></p>
-<figcaption>Figure 4: A 2D toy embedding space. Semantically related words cluster together — royalty in the top right, animals in the bottom left, fruits in the middle. “Close” in this space means “related in meaning”. The dashed arrows hint at something even more structured we’re about to unpack. (Real embedding spaces have hundreds or thousands of dimensions and are far messier than this, but the same intuition holds.)</figcaption>
+<figcaption>Figure 4: A 2D toy embedding space. Semantically related words cluster together — royalty in the top right, animals in the bottom left, fruits in the middle. “Close” in this space means “related in meaning” (i.e.&nbsp;high dot product). The dashed arrows hint at something even more structured we’re about to unpack. (Real embedding spaces have hundreds or thousands of dimensions and are far messier than this, but the same intuition holds.)</figcaption>
 </figure>
 </div>
 <p>The classic demonstration is the king–queen analogy. After training, the following approximate relationship holds between word vectors:</p>
